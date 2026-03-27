@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+.env
+.venv
+
+# Data & DB
+data/simulador.db
+data/simulador.db-wal
+data/simulador.db-shm
+data/ultima_sesion.txt
+data/control.json
+data/evento_pendiente.json
+*.db
+*.db-wal
+*.db-shm
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
