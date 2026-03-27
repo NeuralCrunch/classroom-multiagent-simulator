@@ -1,0 +1,36 @@
+{
+  "experimento": {
+    "nombre": "DEMO_Matematicas_3ESO",
+    "seed": "demo_mat_001",
+    "descripcion": "Matemáticas 3º ESO · Ecuaciones de segundo grado"
+  },
+  "contexto": {
+    "pais": "ES",
+    "lengua": "es",
+    "centro": "public",
+    "entorno": "urban",
+    "modalidad": "face",
+    "escs_quintil": "Q3"
+  },
+  "aula": {
+    "etapa": "SEC",
+    "edad_media": 14,
+    "n_alumnos": 12,
+    "nee": "low",
+    "qs_area": "nat",
+    "qs_subject": "Mathematics",
+    "isced": "2",
+    "perfiles_garantizados": ["Ansiedad severa", "Altas capacidades", "TDAH", "Barrera lingüística"]
+  },
+  "sesion": {
+    "fases": [
+      {"tipo": "lecture",    "descripcion": "Explicación fórmula cuadrática", "turnos": 4, "pizarra": "x = (−b ± √(b²−4ac)) / 2a"},
+      {"tipo": "question",   "descripcion": "Preguntas sobre el discriminante",  "turnos": 4, "pizarra": "Si b²−4ac > 0 → dos soluciones reales"},
+      {"tipo": "group_work", "descripcion": "Resolución en grupos",              "turnos": 5, "pizarra": "x²−5x+6=0  ·  2x²+3x−2=0"},
+      {"tipo": "correction", "descripcion": "Corrección colectiva y cierre",     "turnos": 3, "pizarra": "Soluciones: x=2,x=3  ·  x=½,x=−2"}
+    ],
+    "umbral_activacion": 35,
+    "max_agentes_activos": 4,
+    "pausa_entre_turnos_segundos": 3
+  }
+}
