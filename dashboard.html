@@ -1,0 +1,1996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Classroom Multi-Agent Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#080c18;--surf:#0d1220;--card:#111828;
+  --b0:rgba(255,255,255,.06);--b1:rgba(255,255,255,.12);
+  --txt:#e8eaf0;--mut:#6070a0;--hint:#3a4a6a;
+  --amb:#f5b942;--grn:#4ddf8a;--red:#ff5a5a;--blu:#4a9eff;--pur:#b48aff;--cya:#60d4f0;
+  --r:6px;--rl:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--surf);border-bottom:1px solid var(--b0);flex-shrink:0;flex-wrap:wrap}
+h1{font-size:12px;font-weight:600;color:#d0daf0;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+h1 strong{color:#7ab8ff;font-weight:700}
+.sbadge{display:flex;align-items:center;gap:5px;font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--b1);color:#8898c0;background:var(--card)}
+.sdot{width:5px;height:5px;border-radius:50%;background:var(--mut)}
+.sdot.live{background:var(--grn);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.chips{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.chip{font-size:9.5px;padding:2px 7px;border-radius:3px;border:1px solid var(--b1);color:#8898c0}
+.ctrls{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
+.btn{padding:4px 12px;border-radius:var(--r);border:1px solid var(--b1);background:transparent;color:var(--txt);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.05)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-grn{color:var(--grn);border-color:rgba(77,223,138,.3);font-weight:600}
+.btn-pur{color:var(--pur);border-color:rgba(180,138,255,.3)}
+.btn-amb{color:var(--amb);border-color:rgba(245,185,66,.3)}
+.btn-blu{color:var(--blu);border-color:rgba(74,158,255,.3)}
+.btn-red{color:var(--red);border-color:rgba(255,90,90,.3)}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:1px;padding:0 14px;background:var(--surf);border-bottom:1px solid var(--b0);flex-shrink:0}
+.tab{padding:6px 14px;font-size:11px;color:#7080a8;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:#d0daf0}
+.tab.on{color:#7ab8ff;border-color:#7ab8ff}
+.tdot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* ── VIEWS ── */
+.views{flex:1;overflow:hidden}
+.view{display:none;height:100%;overflow:hidden}
+.view.on{display:flex}
+
+/* ══════════════════════════════════════════════
+   VISTA GRAPH (principal)
+══════════════════════════════════════════════ */
+#view-graph{flex-direction:row}
+@media(max-width:860px){#view-graph{flex-direction:column}}
+
+/* Panel grafo */
+.graph-pane{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;min-width:0}
+.graph-area{flex:1;position:relative;overflow:hidden;min-height:0}
+.graph-area svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* Estado vacío */
+#graph-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:2;pointer-events:none}
+#graph-empty .ge-ico{font-size:32px;animation:spin 1.5s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#graph-empty .ge-ttl{font-size:13px;font-weight:600;color:#3a5080}
+#graph-empty .ge-sub{font-size:11px;color:#2a3a60}
+
+/* Monitor retro */
+.monitor{flex-shrink:0;height:22vh;min-height:100px;max-height:180px;background:#272e38;border-top:2px solid #3d4a5a;overflow:hidden;display:flex;flex-direction:column}
+.monitor-head{padding:4px 14px;background:#1e252f;border-bottom:1px solid #3d4a5a;font-family:'Courier New',monospace;font-size:8.5px;color:#a8b4c0;display:flex;justify-content:space-between;letter-spacing:.06em;flex-shrink:0}
+.monitor-body{flex:1;padding:7px 14px;font-family:'Courier New',monospace;font-size:10px;line-height:1.9;overflow-y:auto;overflow-x:hidden}
+.monitor-body::-webkit-scrollbar{width:3px}
+.monitor-body::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+.mline{display:flex;gap:7px;align-items:baseline}
+  .mts{color:#8a9aaa;font-size:8.5px;flex-shrink:0}
+.mtag-alert{color:#f85149;font-weight:700;flex-shrink:0}
+.mmsg-alert{color:#ffb3ae}
+.mtag-sys{color:#d2a8ff;font-weight:700;flex-shrink:0}
+.mmsg-sys{color:#ecd8ff}
+.mtag-teach{color:#3fb950;font-weight:700;flex-shrink:0}
+.mmsg-teach{color:#a0efb0}
+.mcursor{display:inline-block;width:6px;height:10px;background:#3fb950;animation:blink 0.8s step-end infinite;vertical-align:middle;margin-left:1px}
+
+/* Leyenda */
+.graph-legend{position:absolute;top:10px;right:10px;background:rgba(8,12,24,.9);border:1px solid #1a2235;border-radius:4px;padding:8px 10px;font-size:9px;z-index:10}
+.gl-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;color:var(--txt);font-size:9.5px}
+.gl-row:last-child{margin-bottom:0;color:var(--txt)}
+.gl-line{height:2px;border-radius:1px;flex-shrink:0}
+.gl-lined{height:0;border-radius:0;flex-shrink:0;border-top:2px dashed}
+
+/* Phase label */
+.phase-lbl{position:absolute;top:10px;left:10px;background:rgba(8,12,24,.9);border:1px solid #1a2235;border-radius:3px;padding:4px 10px;font-size:10px;color:var(--blu);letter-spacing:.04em;z-index:10}
+/* Bocadillos HTML sobre el grafo */
+.bub{position:absolute;z-index:25;pointer-events:none;max-width:140px;animation:bpop .2s cubic-bezier(.34,1.56,.64,1) both}
+.bub.out{animation:bfade .25s ease forwards}
+@keyframes bpop{from{opacity:0;transform:scale(.5) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes bfade{to{opacity:0;transform:scale(.85)}}
+/* Speech bubble */
+.bub-inner{background:#fff;border:1.5px solid #1a2235;border-radius:10px;padding:5px 8px;font-size:9.5px;line-height:1.4;color:#1a2a4a;font-family:-apple-system,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.4);word-break:break-word;position:relative}
+/* Thought bubble: azul oscuro redondeado tipo nube */
+.bub-inner.thought{background:#12183a;border:1.5px solid #2a3a7a;border-radius:20px;color:#8090c8;font-style:italic;box-shadow:0 2px 8px rgba(0,0,0,.6)}
+.bub-inner.thought::before,.bub-inner.thought::after{content:'';position:absolute;border-radius:50%;background:#2a3a7a}
+.bub-inner.thought::before{width:7px;height:7px;bottom:-9px;left:13px}
+.bub-inner.thought::after{width:4px;height:4px;bottom:-14px;left:10px}
+/* Teacher bubble: dorado oscuro */
+.bub-inner.teacher{background:#1a1400;border:1.5px solid #705800;border-radius:10px;color:#c8a030}
+/* Action bubble: naranja, forma irregular */
+.bub-inner.action{background:#1a0e00;border:1.5px solid #8a4400;border-radius:6px 14px 14px 6px;color:#d07030;font-style:italic}
+.bub-inner.action::before{content:'⚡';position:absolute;top:-8px;left:6px;font-size:10px}
+.bub-tail{width:0;height:0;position:absolute}
+.bub-tail.bl{border-left:7px solid transparent;border-right:4px solid transparent;border-top:8px solid #1a2235;bottom:-9px;left:10px}
+.bub-tail.bl-i{border-left:6px solid transparent;border-right:3px solid transparent;border-top:7px solid #fff;bottom:-7px;left:11px;position:absolute}
+.bub-tail.br{border-left:4px solid transparent;border-right:7px solid transparent;border-top:8px solid #1a2235;bottom:-9px;right:10px}
+.bub-tail.br-i{border-left:3px solid transparent;border-right:6px solid transparent;border-top:7px solid #fff;bottom:-7px;right:11px;position:absolute}
+.bub-tail.teacher-i{border-top-color:#1e1800 !important}
+.bub-tail.teacher-bl{border-top-color:#6a5000 !important}
+
+/* Panel derecho */
+  .right-pane{width:40%;flex-shrink:0;background:#f2f4f8;border-left:1px solid #e0e4ec;display:flex;flex-direction:column;overflow:hidden}
+@media(max-width:860px){.right-pane{width:100%;border-left:none;border-top:1px solid #e0e4ec;height:260px}}
+.rp-head{padding:8px 14px;border-bottom:1px solid #e8eaf0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6070a0;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:#fff}
+.rp-feed{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:#f2f4f8}
+.rp-feed::-webkit-scrollbar{width:3px}
+.rp-feed::-webkit-scrollbar-thumb{background:var(--b1);border-radius:2px}
+.msg{display:flex;gap:8px;background:#fff;border-radius:10px;padding:8px 10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.mav{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#f0f2f8;border:1px solid #e0e4ec}
+.mbody{flex:1;min-width:0}
+.mwho{font-size:10px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;color:#1a2040}
+.metag{font-size:8.5px;padding:1px 5px;border-radius:10px;font-weight:600}
+.mbubble{background:transparent;border:none;border-radius:0;padding:0;font-size:10.5px;line-height:1.5;color:#2a3050}
+.msg.ist{border-left:3px solid #d4a820;background:#fffcf2}
+.mthought{font-style:italic;color:#6878a8;background:#f0f2ff;border-radius:8px;padding:2px 6px}
+.maction{font-style:italic;color:#c07020;background:#fff8f0;border-radius:8px;padding:2px 6px}
+.sysmsg{text-align:center;font-size:9px;color:#b0bac8;padding:3px 0;font-style:italic}
+
+/* ══════════════════════════════════════════════
+   OTRAS VISTAS
+══════════════════════════════════════════════ */
+#view-chat{flex-direction:column;padding:0;overflow:hidden;background:#f0f2f6;height:100%}
+#view-docente,#view-metricas{flex-direction:column;padding:12px 14px;overflow-y:auto}
+.card{background:var(--card);border:1px solid var(--b0);border-radius:var(--rl);padding:12px 14px;margin-bottom:10px}
+.ct{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px}
+.chat-feed-full{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;padding:12px 14px;background:#f0f2f6}
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px;margin-bottom:12px}
+.met{background:var(--surf);border-radius:var(--r);padding:10px;text-align:center;border:1px solid var(--b0)}
+.met .mv{font-size:20px;font-weight:600}
+.met .ml{font-size:10px;color:var(--mut);margin-top:2px}
+.sdt-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.sdt-lbl{font-size:10px;color:var(--mut);width:110px;flex-shrink:0}
+.sdt-bg{flex:1;height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.sdt-fill{height:100%;border-radius:2px;transition:width .5s}
+.sdt-val{font-size:10px;font-family:monospace;width:22px;text-align:right;color:var(--mut)}
+.dcard{border:1px solid var(--b0);border-radius:var(--r);padding:8px 10px;margin-bottom:6px}
+.dbadge{font-size:9px;padding:1px 6px;border-radius:10px}
+.dba{background:rgba(77,223,138,.1);color:var(--grn)}
+.dbr{background:rgba(255,90,90,.1);color:var(--red)}
+.dbm{background:rgba(245,185,66,.1);color:var(--amb)}
+
+/* Modal */
+.moverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal{background:var(--card);border:1px solid var(--b1);border-radius:var(--rl);padding:18px;width:340px;max-width:92vw}
+.modal h3{font-size:13px;font-weight:600;margin-bottom:12px}
+.modal input{width:100%;background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);color:var(--txt);padding:7px 10px;font-size:12px;outline:none;margin-bottom:10px;font-family:inherit}
+.modal input:focus{border-color:var(--pur)}
+.mbtns{display:flex;gap:7px}
+.mbtns button{flex:1;padding:8px;border-radius:var(--r);border:1px solid var(--b1);cursor:pointer;font-size:12px;font-family:inherit}
+.mbpri{background:var(--pur);border-color:var(--pur);color:#fff}
+.mbsec{background:transparent;color:var(--mut)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b1);border-radius:2px}
+
+/* ── AFFINITY ── */
+#view-affinity{flex-direction:column;overflow:hidden;background:var(--bg)}
+.aff-toolbar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--surf);border-bottom:1px solid var(--b0);flex-shrink:0;flex-wrap:wrap}
+.aff-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--mut)}
+.aff-toggle{display:flex;gap:2px;background:var(--bg);border-radius:6px;padding:2px;border:1px solid var(--b0)}
+.aff-btn{padding:4px 12px;border-radius:4px;border:none;background:transparent;color:var(--mut);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s}
+.aff-btn.on{background:var(--card);color:#60d4f0;border:1px solid rgba(96,212,240,.3)}
+.aff-refresh{padding:4px 10px;border-radius:var(--r);border:1px solid var(--b1);background:transparent;color:var(--mut);font-size:10px;cursor:pointer;font-family:inherit;margin-left:auto}
+.aff-refresh:hover{color:var(--txt)}
+.aff-body{flex:1;min-height:0;overflow:hidden;position:relative}
+.aff-pane{position:absolute;inset:0;overflow:auto;padding:16px}
+.aff-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--hint);font-size:12px}
+/* Heatmap */
+.heat-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.heat-row{display:flex;gap:4px;align-items:center}
+.heat-lbl{font-size:9px;color:var(--mut);width:54px;text-align:right;padding-right:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.heat-lbl.top{width:36px;height:54px;writing-mode:vertical-rl;transform:rotate(180deg);text-align:left;padding-right:0;padding-top:4px;justify-self:center}
+.heat-cell{width:36px;height:36px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;cursor:pointer;transition:transform .15s;position:relative;flex-shrink:0}
+.heat-cell:hover{transform:scale(1.15);z-index:10}
+.heat-cell.self{background:var(--card)!important;color:var(--hint)!important}
+.heat-tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#1a2235;border:1px solid var(--b1);border-radius:5px;padding:5px 8px;font-size:9px;color:var(--txt);white-space:nowrap;z-index:20;pointer-events:none;opacity:0;transition:opacity .15s}
+.heat-cell:hover .heat-tip{opacity:1}
+/* Network */
+#aff-svg .aff-node circle{transition:r .3s}
+#aff-svg .aff-node text{pointer-events:none;font-family:-apple-system,sans-serif}
+.aff-legend{padding:6px 14px;border-top:1px solid var(--b0);display:flex;gap:14px;flex-wrap:wrap;flex-shrink:0;background:var(--surf)}
+.aff-leg-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--mut)}
+.aff-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── PANTALLA DE CONFIGURACIÓN ── */
+.config-overlay{position:fixed;inset:0;background:rgba(4,6,14,.96);z-index:200;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px}
+.config-modal{background:#0d1220;border:1px solid #1e2840;border-radius:14px;width:100%;max-width:720px;overflow:hidden}
+.config-header{padding:16px 22px;border-bottom:1px solid #1e2840;display:flex;align-items:center;gap:10px}
+.config-header h2{font-size:15px;font-weight:600;color:#d0daf0}
+.config-header p{font-size:11px;color:#4a6090;margin-top:2px}
+.config-tabs{display:flex;border-bottom:1px solid #1e2840}
+.cfg-tab{padding:10px 18px;font-size:11px;color:#4a6090;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.cfg-tab:hover{color:#a0b8d8}
+.cfg-tab.on{color:#7ab8ff;border-color:#7ab8ff}
+.config-body{padding:20px 22px;max-height:60vh;overflow-y:auto}
+.cfg-section{display:none}
+.cfg-section.on{display:block}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:600px){.cfg-grid{grid-template-columns:1fr}}
+.cfg-field{display:flex;flex-direction:column;gap:5px}
+.cfg-field.full{grid-column:1/-1}
+.cfg-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#4a6090}
+.cfg-input{background:#080c18;border:1px solid #1e2840;border-radius:6px;color:#c0cce0;padding:8px 11px;font-size:12px;font-family:inherit;outline:none;transition:border-color .15s}
+.cfg-input:focus{border-color:#4a9eff}
+.cfg-input::placeholder{color:#2a3a5a}
+.cfg-select{background:#080c18;border:1px solid #1e2840;border-radius:6px;color:#c0cce0;padding:8px 11px;font-size:12px;font-family:inherit;outline:none;cursor:pointer}
+.cfg-select:focus{border-color:#4a9eff}
+.cfg-textarea{background:#080c18;border:1px solid #1e2840;border-radius:6px;color:#c0cce0;padding:8px 11px;font-size:11px;font-family:inherit;outline:none;resize:vertical;min-height:80px;line-height:1.5}
+.cfg-textarea:focus{border-color:#4a9eff}
+.cfg-hint{font-size:9.5px;color:#3a5070;line-height:1.4;margin-top:-8px;grid-column:1/-1}
+.cfg-divider{height:1px;background:#1a2235;margin:16px 0;grid-column:1/-1}
+/* Perfil card de alumno */
+.student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px}
+.student-card{background:#080c18;border:1px solid #1e2840;border-radius:8px;padding:10px 12px;position:relative}
+.student-card-head{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.student-emoji{font-size:18px}
+.student-name{font-size:11px;font-weight:600;color:#c0cce0;flex:1}
+.student-tag{font-size:8.5px;padding:1px 6px;border-radius:10px;background:rgba(155,127,232,.15);color:#9b7fe8;border:1px solid rgba(155,127,232,.3)}
+.student-bars{display:flex;flex-direction:column;gap:4px}
+.sbar-row{display:flex;align-items:center;gap:5px}
+.sbar-lbl{font-size:8px;color:#3a5070;width:52px;flex-shrink:0}
+.sbar-bg{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.sbar-fill{height:100%;border-radius:2px}
+/* Botón generar */
+.gen-btn{width:100%;padding:10px;border-radius:8px;border:1px solid #2a5080;background:rgba(74,158,255,.08);color:#7ab8ff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:12px}
+.gen-btn:hover{background:rgba(74,158,255,.15);border-color:#4a9eff}
+.gen-btn:disabled{opacity:.4;cursor:not-allowed}
+.gen-status{font-size:10px;color:#4a6090;text-align:center;margin-bottom:10px;min-height:16px}
+/* Footer */
+.config-footer{padding:14px 22px;border-top:1px solid #1e2840;display:flex;gap:8px;justify-content:flex-end;background:#080c18}
+.cfg-btn-pri{padding:8px 20px;border-radius:6px;border:none;background:#4a9eff;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.cfg-btn-pri:hover{background:#6ab4ff}
+.cfg-btn-pri:disabled{opacity:.4;cursor:not-allowed}
+.cfg-btn-sec{padding:8px 16px;border-radius:6px;border:1px solid #1e2840;background:transparent;color:#6070a0;font-size:12px;cursor:pointer;font-family:inherit}
+.cfg-btn-sec:hover{color:#a0b0d0}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1>Classroom <strong>Multi-Agent</strong> Simulator</h1>
+  <div class="sbadge"><div class="sdot" id="sdot"></div><span id="stxt">Ready</span></div>
+  <div class="chips">
+    <span class="chip" id="chip-ses">No session</span>
+    <span class="chip" id="chip-fase">—</span>
+    <span class="chip" id="chip-turno">—</span>
+    <span class="chip" id="chip-al">—</span>
+  </div>
+  <div class="ctrls">
+    <button class="btn btn-grn" id="btn-demo" onclick="launchDemo()">▶ Start Demo</button>
+    <button class="btn" id="btn-pause" onclick="togglePause()" style="display:none">⏸ Pause</button>
+    <button class="btn btn-blu" id="btn-replay" onclick="toggleReplay()" style="display:none">↺ Replay</button>
+    <button class="btn btn-red" id="btn-event" onclick="openModal()" style="display:none">🎲 Event</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab on" onclick="goTab('graph')"><span class="tdot" style="background:var(--blu)"></span>Agent graph</div>
+  <div class="tab" onclick="goTab('chat')"><span class="tdot" style="background:var(--grn)"></span>Chat log</div>
+  <div class="tab" onclick="goTab('docente')"><span class="tdot" style="background:var(--amb)"></span>Teacher</div>
+  <div class="tab" onclick="goTab('metricas')"><span class="tdot" style="background:var(--pur)"></span>Metrics</div>
+  <div class="tab" onclick="goTab('affinity')"><span class="tdot" style="background:#60d4f0"></span>Affinity</div>
+</div>
+
+<!-- VIEWS -->
+<div class="views">
+
+  <!-- GRAPH VIEW -->
+  <div class="view on" id="view-graph">
+    <div class="graph-pane" id="graph-pane">
+      <div class="graph-area" id="graph-area">
+      <div class="phase-lbl" id="phase-lbl">— Waiting for session —</div>
+
+      <!-- SVG del grafo -->
+      <svg id="graph-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr-amb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M1 1L9 5L1 9" fill="none" stroke="#f5b942" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <!-- Aristas y nodos se renderizan aquí via JS -->
+        <g id="g-edges"></g>
+        <g id="g-nodes"></g>
+      </svg>
+
+      <!-- Estado vacío -->
+      <div id="graph-empty">
+        <div class="ge-ico">⬡</div>
+        <div class="ge-ttl">No active session</div>
+        <div class="ge-sub">Press ▶ Demo or ⏭ Step to start</div>
+      </div>
+
+      </div><!-- /graph-area -->
+
+      <!-- Monitor retro sistema afectivo -->
+      <div class="monitor" id="monitor">
+        <div class="monitor-head">
+          <span>AFFECTIVE COMPUTING SYSTEM</span>
+          <span id="mon-session">SESSION —</span>
+        </div>
+        <div class="monitor-body" id="mon-body">
+          <div class="mline"><span class="mts">—:—:—</span><span class="mtag-sys">[SYSTEM]</span><span class="mmsg-sys">Awaiting session...<span class="mcursor"></span></span></div>
+        </div>
+      </div>
+
+
+    </div>
+
+    <!-- Panel derecho: diálogo -->
+    <div class="right-pane">
+      <div class="rp-head">
+        <span>Dialogue</span>
+        <span id="chat-cnt" style="font-family:monospace;font-size:9px;color:#8090b0">0 turns</span>
+      </div>
+      <div class="rp-feed" id="rp-feed">
+        <div class="sysmsg">Waiting for session...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT LOG -->
+  <div class="view" id="view-chat">
+    <div class="chat-feed-full" id="cf-main">
+      <div class="sysmsg">Waiting for session...</div>
+    </div>
+  </div>
+
+  <!-- TEACHER -->
+  <div class="view" id="view-docente">
+    <div class="card" id="card-doc"><div class="ct">Teacher agent</div><div style="color:var(--mut);font-size:11px">No session.</div></div>
+    <div class="card"><div class="ct">Proposals & decisions</div><div id="dec-list" style="color:var(--mut);font-size:11px">No decisions yet.</div></div>
+    <div class="card"><div class="ct">SDT profile · initial vs. emergent</div><div id="pc-grid"><div style="color:var(--mut);font-size:11px">Available at session end.</div></div></div>
+  </div>
+
+  <!-- METRICS -->
+  <div class="view" id="view-metricas">
+    <div class="mets">
+      <div class="met"><div class="mv" id="m-ctrl">—</div><div class="ml">Control perceived</div></div>
+      <div class="met"><div class="mv" id="m-val">—</div><div class="ml">Task value</div></div>
+      <div class="met"><div class="mv" id="m-acc">—</div><div class="ml">Acceptance rate</div></div>
+      <div class="met"><div class="mv" id="m-prop">—</div><div class="ml">Proposals</div></div>
+    </div>
+    <div class="card"><div class="ct">Emotional distribution · CVT (Pekrun, 2006)</div><div style="height:160px;position:relative"><canvas id="dist-chart"></canvas></div></div>
+    <div class="card"><div class="ct">Teacher style signature · SDT (Reeve, 2009)</div><div id="tsig" style="color:var(--mut);font-size:11px">Available at session end.</div></div>
+  </div>
+</div>
+
+
+  <!-- AFFINITY -->
+  <div class="view" id="view-affinity">
+    <div class="aff-toolbar">
+      <span class="aff-title">Affinity · interaction map</span>
+      <div class="aff-toggle">
+        <button class="aff-btn on" id="aff-btn-heat" onclick="affView('heat')">⊞ Heatmap</button>
+        <button class="aff-btn" id="aff-btn-net" onclick="affView('net')">⬡ Network</button>
+      </div>
+      <button class="aff-refresh" onclick="loadAffinity()">↺ Refresh</button>
+    </div>
+    <div class="aff-body">
+      <div id="aff-heat" class="aff-pane">
+        <div class="aff-empty">No session data yet.</div>
+      </div>
+      <div id="aff-net" class="aff-pane" style="display:none">
+        <svg id="aff-svg" width="100%" height="100%"></svg>
+      </div>
+    </div>
+    <div class="aff-legend" id="aff-legend"></div>
+  </div>
+
+<!-- PANTALLA DE CONFIGURACIÓN -->
+<div class="config-overlay" id="config-overlay" style="display:none">
+  <div class="config-modal">
+    <div class="config-header">
+      <div>
+        <h2>⚙ Classroom Configuration</h2>
+        <p>Define el contexto del aula antes de iniciar la simulación</p>
+      </div>
+    </div>
+    <div class="config-tabs">
+      <div class="cfg-tab on" onclick="cfgTab('context')">1 · Context</div>
+      <div class="cfg-tab" onclick="cfgTab('teacher')">2 · Teacher</div>
+      <div class="cfg-tab" onclick="cfgTab('students')">3 · Students</div>
+      <div class="cfg-tab" onclick="cfgTab('session')">4 · Session</div>
+    </div>
+    <div class="config-body">
+
+      <!-- TAB 1: CONTEXT -->
+      <div class="cfg-section on" id="cfg-context">
+        <div class="cfg-grid">
+          <div class="cfg-field">
+            <label class="cfg-label">ISCED Level</label>
+            <select class="cfg-select" id="cfg-isced" onchange="updateCourseLabel()">
+              <option value="0">ISCED 0 — Early childhood education (0–5)</option>
+              <option value="1">ISCED 1 — Primary education (6–11)</option>
+              <option value="2" selected>ISCED 2 — Lower secondary / ESO (12–15)</option>
+              <option value="3">ISCED 3 — Upper secondary / Bachillerato (16–18)</option>
+              <option value="4">ISCED 4 — Post-secondary non-tertiary / FP (18–20)</option>
+              <option value="5">ISCED 5 — Short-cycle tertiary / Higher vocational</option>
+              <option value="6">ISCED 6 — Bachelor's / Grado universitario</option>
+              <option value="7">ISCED 7 — Master's level</option>
+              <option value="8">ISCED 8 — Doctoral level</option>
+            </select>
+          </div>
+
+          <div class="cfg-field">
+            <label class="cfg-label">QS Subject Area</label>
+            <select class="cfg-select" id="cfg-qs-area" onchange="updateQsSubjects()">
+              <option value="nat" selected>Natural Sciences</option>
+              <option value="eng">Engineering & Technology</option>
+              <option value="lss">Life Sciences & Medicine</option>
+              <option value="ssh">Social Sciences & Management</option>
+              <option value="art">Arts & Humanities</option>
+            </select>
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">QS Subject</label>
+            <select class="cfg-select" id="cfg-qs-subject">
+              <option value="mathematics" selected>Mathematics</option>
+              <option value="physics">Physics</option>
+              <option value="chemistry">Chemistry</option>
+              <option value="statistics_&_operational_research">Statistics & Operational Research</option>
+              <option value="computer_science_&_information_systems">Computer Science & Information Systems</option>
+              <option value="environmental_sciences">Environmental Sciences</option>
+              <option value="geography">Geography</option>
+            </select>
+          </div>
+          <div class="cfg-field full">
+            <label class="cfg-label">Topic / Unit</label>
+            <input class="cfg-input" id="cfg-topic" placeholder="e.g. Ecuaciones de 2º grado" value="Ecuaciones de segundo grado">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">School type</label>
+            <select class="cfg-select" id="cfg-school">
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="charter">Charter / Concertado</option>
+            </select>
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Environment</label>
+            <select class="cfg-select" id="cfg-env">
+              <option value="urban">Urban</option>
+              <option value="suburban">Suburban</option>
+              <option value="rural">Rural</option>
+            </select>
+          </div>
+          <div class="cfg-field full">
+            <label class="cfg-label">Socioeconomic status (SES) <span style="color:#3a5070;font-weight:400;text-transform:none">— family income & cultural capital quintile</span></label>
+            <select class="cfg-select" id="cfg-ses">
+              <option value="Q1">Q1 — Low SES (bottom 20%: low income, limited resources)</option>
+              <option value="Q2">Q2 — Lower-middle SES</option>
+              <option value="Q3" selected>Q3 — Middle SES (median income, mixed resources)</option>
+              <option value="Q4">Q4 — Upper-middle SES</option>
+              <option value="Q5">Q5 — High SES (top 20%: high income, rich cultural capital)</option>
+            </select>
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Language of instruction</label>
+            <select class="cfg-select" id="cfg-lang">
+              <option value="es" selected>Spanish</option>
+              <option value="ca">Catalan</option>
+              <option value="en">English</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="pt">Portuguese</option>
+              <option value="it">Italian</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="cfg-field full">
+            <label class="cfg-label">Context notes (optional)</label>
+            <textarea class="cfg-textarea" id="cfg-notes" placeholder="Additional context: recent events, classroom dynamics, special circumstances..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: TEACHER -->
+      <div class="cfg-section" id="cfg-teacher">
+        <div class="cfg-grid">
+          <div class="cfg-field">
+            <label class="cfg-label">Name</label>
+            <input class="cfg-input" id="cfg-tname" placeholder="e.g. Prof. García" value="Prof. García">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Age</label>
+            <input class="cfg-input" id="cfg-tage" type="number" placeholder="38" value="41" min="22" max="70">
+          </div>
+          <div class="cfg-field full">
+            <label class="cfg-label">Description</label>
+            <textarea class="cfg-textarea" id="cfg-tdesc" placeholder="Teaching style, personality, strengths and weaknesses...">Profesora metódica y exigente. Sigue el libro con rigor. Le cuesta adaptar el ritmo cuando la clase se dispersa.</textarea>
+          </div>
+          <div class="cfg-divider"></div>
+          <div class="cfg-field">
+            <label class="cfg-label">SDT Autonomy support (0–100)</label>
+            <input class="cfg-input" id="cfg-sdt-aut" type="number" value="42" min="0" max="100">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">SDT Structure (0–100)</label>
+            <input class="cfg-input" id="cfg-sdt-str" type="number" value="80" min="0" max="100">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">SDT Involvement (0–100)</label>
+            <input class="cfg-input" id="cfg-sdt-inv" type="number" value="58" min="0" max="100">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Motivation (0–100)</label>
+            <input class="cfg-input" id="cfg-tmot" type="number" value="64" min="0" max="100">
+          </div>
+          <div class="cfg-hint">SDT Teaching Style (Reeve, 2009). Autonomy ↑ = more student choice. Structure ↑ = more rules and procedures. Involvement ↑ = more emotional support.</div>
+        </div>
+      </div>
+
+      <!-- TAB 3: STUDENTS -->
+      <div class="cfg-section" id="cfg-students">
+        <div class="cfg-grid">
+          <div class="cfg-field">
+            <label class="cfg-label">Number of students</label>
+            <input class="cfg-input" id="cfg-nstu" type="number" value="12" min="4" max="32">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Special profiles (comma-separated)</label>
+            <input class="cfg-input" id="cfg-profiles" placeholder="e.g. Anxiety, ADHD, Gifted" value="Ansiedad severa, Altas capacidades, TDAH, Barrera lingüística">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Mean age</label>
+            <input class="cfg-input" id="cfg-age" type="number" value="14" min="6" max="18">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Group cohesion (0–100)</label>
+            <input class="cfg-input" id="cfg-cohesion" type="number" value="58" min="0" max="100">
+          </div>
+          <div class="cfg-hint">Define el contexto del grupo. Los perfiles especiales se distribuirán entre los agentes generados. La generación via Claude creará personalidades realistas y coherentes con el contexto.</div>
+        </div>
+        <button class="gen-btn" id="btn-gen-students" onclick="generateStudents()">
+          <span id="gen-icon">✦</span> Generate student profiles with Claude
+        </button>
+        <div class="gen-status" id="gen-status"></div>
+        <div class="student-grid" id="student-preview"></div>
+      </div>
+
+      <!-- TAB 4: SESSION -->
+      <div class="cfg-section" id="cfg-session">
+        <div class="cfg-grid">
+          <div class="cfg-field">
+            <label class="cfg-label">Pause between turns (seconds)</label>
+            <input class="cfg-input" id="cfg-pausa" type="number" value="3.0" min="0.5" max="10" step="0.5">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">CVT alert threshold</label>
+            <input class="cfg-input" id="cfg-threshold" type="number" value="35" min="10" max="60">
+          </div>
+          <div class="cfg-field full">
+            <label class="cfg-label">Session phases</label>
+            <textarea class="cfg-textarea" id="cfg-phases" style="min-height:100px">lecture: Explicación de la fórmula cuadrática
+question: Preguntas sobre el discriminante
+group_work: Resolución en grupos
+correction: Corrección colectiva y cierre</textarea>
+          </div>
+          <div class="cfg-hint">One phase per line: type: description. Types: lecture, question, group_work, correction, pair_work.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="config-footer">
+      <button class="cfg-btn-sec" onclick="closeConfig()">Cancel</button>
+      <button class="cfg-btn-sec" onclick="loadDemo()">Load demo defaults</button>
+      <button class="cfg-btn-pri" id="btn-cfg-start" onclick="saveConfigAndStart()">▶ Start simulation</button>
+    </div>
+  </div>
+</div>
+<!-- MODAL EVENTO -->
+<div class="moverlay" id="moverlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>🎲 Inject external event</h3>
+    <input type="text" id="ev-in" placeholder="e.g. Phone rings, director enters..." onkeydown="if(event.key==='Enter')sendEventModal()">
+    <div class="mbtns">
+      <button class="mbsec" onclick="closeModal()">Cancel</button>
+      <button class="mbpri" onclick="sendEventModal()">Inject</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CVT COLORS & MAPS
+// ════════════════════════════════════════════════════════
+const EC={
+  enjoyment:'#4ddf8a', pride:'#a78bfa',
+  anxiety:'#ff5a5a',   boredom:'#f5b942',
+  hopelessness:'#6b7280', neutral:'#4a9eff'
+};
+const EI={enjoyment:'😊',pride:'😤',anxiety:'😰',boredom:'😑',hopelessness:'😟',neutral:'😐'};
+const EMAP={
+  disfrute:'enjoyment',orgullo:'pride',ansiedad:'anxiety',
+  aburrimiento:'boredom',desesperanza:'hopelessness',neutro:'neutral',
+  enjoyment:'enjoyment',pride:'pride',anxiety:'anxiety',
+  boredom:'boredom',hopelessness:'hopelessness',neutral:'neutral'
+};
+function normE(e){return EMAP[e]||'neutral';}
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
+function hexA(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+
+// ════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ════════════════════════════════════════════════════════
+const API='';
+let sesionId=null, lastSesionId=null, lastDecId=null;
+let ultimoTurno=0, chatCnt=0;
+let agMap={}, nodePos={}, grupos=[];
+let faseActual=0, distChart=null;
+let pausado=false, stepMode=false;
+let pollTimer=null;
+const renderedKeys=new Set();
+let lastSpeechByAgent={};
+let demoActive=false;  // true solo tras pulsar Demo
+// Aristas activas: {id, x1,y1,x2,y2, tipo, color, opacity, born}
+let activeEdges=[];
+let edgeSeq=0;
+
+// ════════════════════════════════════════════════════════
+//  LAYOUT DE NODOS (en % del contenedor)
+// ════════════════════════════════════════════════════════
+// Docente centrado arriba; 12 alumnos en 3 filas de 4
+const LAYOUT_DOC = {px:.50, py:.08};
+const LAYOUT_STU = [
+  {px:.12,py:.30},{px:.37,py:.30},{px:.63,py:.30},{px:.88,py:.30},
+  {px:.12,py:.55},{px:.37,py:.55},{px:.63,py:.55},{px:.88,py:.55},
+  {px:.12,py:.78},{px:.37,py:.78},{px:.63,py:.78},{px:.88,py:.78},
+];
+
+function getGraphSize(){
+  const p=document.getElementById('graph-area')||document.getElementById('graph-pane');
+  return {W:p.offsetWidth||600, H:p.offsetHeight||500};
+}
+function pctToXY(pct){
+  const {W,H}=getGraphSize();
+  return {x:Math.round(pct.px*W), y:Math.round(pct.py*H)};
+}
+function buildNodePositions(agentes){
+  const pos={};
+  const doc=agentes.find(a=>a.rol==='teacher');
+  const stu=agentes.filter(a=>a.rol==='student');
+  if(doc) pos[doc.id]=pctToXY(LAYOUT_DOC);
+  stu.forEach((a,i)=>{
+    const pct=LAYOUT_STU[i]||{px:.5,py:.9};
+    pos[a.id]=pctToXY(pct);
+  });
+  return pos;
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER GRAFO SVG
+// ════════════════════════════════════════════════════════
+const SVG_NS='http://www.w3.org/2000/svg';
+const NODE_R_STU=22; // radio alumno
+const NODE_R_DOC=28; // radio docente
+
+function mkSvgEl(tag,attrs){
+  const el=document.createElementNS(SVG_NS,tag);
+  Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
+  return el;
+}
+
+function renderGraph(agentes){
+  const svg=document.getElementById('graph-svg');
+  const gN=document.getElementById('g-nodes');
+  const gE=document.getElementById('g-edges');
+  // Limpiar y rerenderizar siempre que tengamos posiciones para todos
+  const allHavePos=agentes.every(a=>nodePos[a.id]);
+  if(!allHavePos) return; // esperar a que nodePos esté listo
+  gN.innerHTML='';
+  // No limpiar aristas — se gestionan dinámicamente
+
+  const doc=agentes.find(a=>a.rol==='teacher');
+  const stu=agentes.filter(a=>a.rol==='student');
+
+  // Nodo docente
+  if(doc){
+    const p=nodePos[doc.id]||pctToXY(LAYOUT_DOC);
+    renderNode(gN, doc, p, NODE_R_DOC, true);
+  }
+  // Nodos alumnos
+  stu.forEach(al=>{
+    const p=nodePos[al.id];
+    if(p) renderNode(gN, al, p, NODE_R_STU, false);
+  });
+
+  document.getElementById('graph-empty').style.display='none';
+}
+
+function renderNode(parent, ag, pos, r, isDoc){
+  const emo=normE(ag.emocion_dominante||'neutral');
+  const col=isDoc?'#e2eaff':EC[emo];
+  const g=mkSvgEl('g',{id:'gn-'+ag.id,'data-id':ag.id,style:'cursor:pointer'});
+
+  // Anillo de pulso
+  const pulse=mkSvgEl('circle',{cx:pos.x,cy:pos.y,r:r+4,
+    fill:'none',stroke:col,'stroke-width':'1.5',opacity:'0',id:'pulse-'+ag.id});
+  g.appendChild(pulse);
+
+  // Círculo principal
+  g.appendChild(mkSvgEl('circle',{cx:pos.x,cy:pos.y,r,
+    fill:hexA(col,.09),stroke:col,
+    'stroke-width':isDoc?'2.5':'2',
+    id:'circle-'+ag.id,style:'transition:stroke .4s,fill .4s'}));
+
+  // Nombre se añade después del append
+  // Emoji
+  const em=mkSvgEl('text',{x:pos.x,y:pos.y+(isDoc?5:4),
+    'text-anchor':'middle','dominant-baseline':'middle',
+    'font-size':isDoc?'22':'18',style:'pointer-events:none'});
+  em.textContent=ag.emoji||'🧑';
+  g.appendChild(em);
+
+  // Nombre  (r+13 debajo del centro)
+  {const nm=mkSvgEl('text',{x:pos.x,y:pos.y+r+13,'text-anchor':'middle','font-size':'9','font-weight':'700','font-family':'-apple-system,sans-serif',fill:col,id:'name-'+ag.id,style:'transition:fill .4s'});nm.textContent=ag.nombre;g.appendChild(nm);}
+
+  if(!isDoc){
+    const ctrl=Math.round(parseFloat(ag.control)||50);
+
+    // Emoción emoji+texto  (r+25)
+    const emoLbl=mkSvgEl('text',{x:pos.x,y:pos.y+r+25,
+      'text-anchor':'middle','font-size':'8',
+      'font-weight':'600','font-family':'-apple-system,sans-serif',
+      fill:col,id:'cvt-'+ag.id,style:'transition:fill .4s'});
+    emoLbl.textContent=`${EI[emo]} ${cap(emo)}`;
+    g.appendChild(emoLbl);
+
+    // Barra fondo  (r+30)
+    const barW=40, barH=4;
+    const barX=pos.x-barW/2, barY=pos.y+r+30;
+    g.appendChild(mkSvgEl('rect',{x:barX,y:barY,
+      width:barW,height:barH,rx:'2',
+      fill:'rgba(255,255,255,0.07)'}));
+
+    // Barra fill  (r+30)
+    g.appendChild(mkSvgEl('rect',{
+      x:barX,y:barY,
+      width:Math.max(2,Math.round(barW*ctrl/100)),
+      height:barH,rx:'2',fill:col,opacity:'0.8',
+      id:'bar-'+ag.id,style:'transition:width .5s,fill .4s'}));
+
+    // Valor numérico  (r+40)
+    const ctrlLbl=mkSvgEl('text',{
+      x:pos.x+barW/2+3,y:barY+barH+1,
+      'text-anchor':'start','font-size':'7',
+      'font-family':'monospace',
+      fill:hexA(col,.7),id:'ctrl-'+ag.id});
+    ctrlLbl.textContent=ctrl;
+    g.appendChild(ctrlLbl);
+
+  }else{
+    // Etiqueta SDT docente  (r+25)
+    const sdt=mkSvgEl('text',{x:pos.x,y:pos.y+r+25,
+      'text-anchor':'middle','font-size':'7.5',
+      'font-family':'-apple-system,sans-serif',
+      fill:'rgba(226,234,255,.5)'});
+    sdt.textContent=`Teacher · SDT ${ag.sdt_autonomia_docente||'—'}/${ag.sdt_estructura_docente||'—'}`;
+    g.appendChild(sdt);
+  }
+
+  parent.appendChild(g);
+}
+
+function updateNodeEmo(agId, emo, ctrlVal){
+  const col=EC[emo]||'#4a9eff';
+  const circle=document.getElementById('circle-'+agId);
+  if(circle){circle.setAttribute('stroke',col);circle.setAttribute('fill',hexA(col,.08));}
+  const name=document.getElementById('name-'+agId);
+  if(name) name.setAttribute('fill',col);
+  const cvt=document.getElementById('cvt-'+agId);
+  if(cvt){cvt.setAttribute('fill',col);cvt.textContent=`${EI[emo]} ${cap(emo)}`;}
+  const ctrl=Math.round(ctrlVal||50);
+  const bar=document.getElementById('bar-'+agId);
+  if(bar){
+    const barW=44;
+    bar.setAttribute('width',Math.round(barW*ctrl/100));
+    bar.setAttribute('fill',col);
+  }
+  const ctrlLbl=document.getElementById('ctrl-'+agId);
+  if(ctrlLbl){ctrlLbl.setAttribute('fill',hexA(col,.6));ctrlLbl.textContent=ctrl;}
+}
+
+// ── BOCADILLOS HTML ──────────────────────────────────────────────────────────
+const activeBubs={};
+
+function showBubble(agId, text, tipo){
+  // tipo: 'speech' | 'thought' | 'teacher'
+  const pos=nodePos[agId];
+  if(!pos||!text) return;
+  const pane=document.getElementById('graph-area')||document.getElementById('graph-pane');
+  if(!pane) return;
+
+  // Quitar bocadillo anterior del mismo agente
+  if(activeBubs[agId]){
+    activeBubs[agId].classList.add('out');
+    const old=activeBubs[agId];
+    setTimeout(()=>old.remove(),250);
+  }
+
+  const bub=document.createElement('div');
+  bub.className='bub';
+
+  const innerCls=tipo==='thought'?'thought':tipo==='teacher'?'teacher':'';
+  const safe=text.slice(0,80)+(text.length>80?'…':'');
+  const hasTail=tipo!=='thought'&&tipo!=='action';
+  bub.innerHTML=`<div class="bub-inner ${innerCls}">${tipo==='thought'?'💭 ':''}${safe}${hasTail?`<div class="bub-tail bl ${innerCls==='teacher'?'teacher-bl':''}"></div><div class="bub-tail bl-i ${innerCls==='teacher'?'teacher-i':''}"></div>`:''}  </div>`;
+
+  // Posición: encima-derecha del nodo, flip si se sale
+  const pW=pane.offsetWidth||600;
+  const R=agId==='doc'?NODE_R_DOC+2:NODE_R_STU+2;
+  let left=pos.x+R+4;
+  let top=pos.y-R-8;
+  const estW=145;
+  if(left+estW>pW-10){
+    left=pos.x-estW-R-4;
+    // Cambiar cola a derecha
+    const tailBl=bub.querySelector('.bub-tail.bl');
+    const tailBli=bub.querySelector('.bub-tail.bl-i');
+    if(tailBl){tailBl.className='bub-tail br';}
+    if(tailBli){tailBli.className=`bub-tail br-i ${innerCls==='teacher'?'teacher-i':innerCls==='thought'?'thought-i':''}`;}
+  }
+  if(top<4) top=pos.y+R+4;
+
+  bub.style.left=left+'px';
+  bub.style.top=top+'px';
+  pane.appendChild(bub); // pane ya apunta a graph-area
+  activeBubs[agId]=bub;
+
+  const dur=tipo==='thought'?4000:tipo==='teacher'?5000:4000;
+  setTimeout(()=>{
+    bub.classList.add('out');
+    setTimeout(()=>{bub.remove();if(activeBubs[agId]===bub)delete activeBubs[agId];},250);
+  },dur);
+}
+
+function clearAllBubbles(){
+  Object.keys(activeBubs).forEach(id=>{
+    if(activeBubs[id]){activeBubs[id].classList.add('out');activeBubs[id].remove();delete activeBubs[id];}
+  });
+}
+
+function pulseDocGroup(){
+  // Segundo círculo pulsante alrededor del docente cuando habla al grupo
+  const docAg=Object.values(agMap).find(a=>a.rol==='teacher');
+  if(!docAg||!nodePos[docAg.id]) return;
+  const pos=nodePos[docAg.id];
+  const svg=document.getElementById('graph-svg');
+  const gN=document.getElementById('g-nodes');
+
+  // Quitar anillo anterior si existe
+  document.getElementById('doc-group-ring')?.remove();
+
+  const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  ring.setAttribute('id','doc-group-ring');
+  ring.setAttribute('cx',pos.x);
+  ring.setAttribute('cy',pos.y);
+  ring.setAttribute('r', NODE_R_DOC+8);
+  ring.setAttribute('fill','none');
+  ring.setAttribute('stroke','#e2eaff');
+  ring.setAttribute('stroke-width','2');
+  ring.setAttribute('opacity','0.7');
+  ring.setAttribute('stroke-dasharray','6 3');
+  gN.insertBefore(ring, gN.firstChild); // detrás de los nodos
+
+  // Animación de expansión y fade
+  let r=NODE_R_DOC+8, op=0.7;
+  const anim=()=>{
+    r+=0.6; op=Math.max(0,op-0.018);
+    ring.setAttribute('r',r);
+    ring.setAttribute('opacity',op);
+    if(op>0) requestAnimationFrame(anim);
+    else ring.remove();
+  };
+  requestAnimationFrame(anim);
+
+  // También pulsar el nodo
+  pulseNode(docAg.id,'#e2eaff');
+}
+
+function pulseNode(agId, col){
+  const pulse=document.getElementById('pulse-'+agId);
+  if(!pulse) return;
+  pulse.setAttribute('stroke',col);
+  pulse.setAttribute('opacity','0.6');
+  let r=parseFloat(pulse.getAttribute('r'));
+  const base=r;
+  const anim=()=>{
+    r+=0.8;
+    if(r>base+18){pulse.setAttribute('opacity','0');pulse.setAttribute('r',base);return;}
+    const op=Math.max(0,0.6*(1-(r-base)/18));
+    pulse.setAttribute('r',r);
+    pulse.setAttribute('opacity',op);
+    requestAnimationFrame(anim);
+  };
+  requestAnimationFrame(anim);
+}
+
+// ════════════════════════════════════════════════════════
+//  ARISTAS
+// ════════════════════════════════════════════════════════
+function addEdge(x1,y1,x2,y2,tipo,col,dashed,opacity,duration,withArrow=true){
+  // tipo: 'solid' | 'dashed' | 'contagion'
+  const id='edge-'+edgeSeq++;
+  const gE=document.getElementById('g-edges');
+  if(!gE) return;
+
+  // Acortar línea para no solaparse con nodos
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2) return; // nodos demasiado cercanos, no dibujar
+  const pad1=tipo==='contagion'?28:32, pad2=tipo==='contagion'?24:28;
+  const ux=dx/len, uy=dy/len;
+  const sx=x1+ux*pad1, sy=y1+uy*pad1;
+  const ex=x2-ux*pad2, ey=y2-uy*pad2;
+
+  const strokeW=tipo==='contagion'?'1':'2';
+  const dash=dashed?(tipo==='contagion'?'3 6':'6 4'):'none';
+  const op=tipo==='contagion'?'0.45':String(opacity||0.85);
+
+  // Marcador dinámico por color
+  const markId='arr-'+col.replace('#','');
+  let marker=document.getElementById(markId);
+  if(!marker){
+    const svgEl=document.getElementById('graph-svg');
+    let defs=svgEl?.querySelector('defs');
+    if(!defs){defs=document.createElementNS(SVG_NS,'defs');svgEl?.insertBefore(defs,svgEl.firstChild);}
+    marker=document.createElementNS(SVG_NS,'marker');
+    marker.setAttribute('id',markId);
+    marker.setAttribute('viewBox','0 0 10 10');
+    marker.setAttribute('refX','9');
+    marker.setAttribute('refY','5');
+    marker.setAttribute('markerWidth','5');
+    marker.setAttribute('markerHeight','5');
+    marker.setAttribute('orient','auto-start-reverse');
+    const path=document.createElementNS(SVG_NS,'path');
+    path.setAttribute('d','M1 1L9 5L1 9');
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke',col);
+    path.setAttribute('stroke-width','1.5');
+    path.setAttribute('stroke-linecap','round');
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  }
+
+  const line=mkSvgEl('line',{
+    id, x1:sx,y1:sy,x2:ex,y2:ey,
+    stroke:col,'stroke-width':strokeW,
+    'stroke-dasharray':dash,opacity:op,
+    ...(withArrow?{'marker-end':`url(#${markId})`}:{})
+  });
+  gE.appendChild(line);
+
+  // Auto-eliminar
+  setTimeout(()=>{line.remove();},duration||3500);
+}
+
+function clearEdges(){
+  document.getElementById('g-edges').innerHTML='';
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER TURNOS → aristas + mensajes
+// ════════════════════════════════════════════════════════
+function renderTurnos(turnos){
+  for(const t of turnos){
+    const k=`${t.fase}-${t.turno}-${t.agente_id}`;
+    if(renderedKeys.has(k)) continue;
+    renderedKeys.add(k);
+
+    const tipo=t.tipo_interaccion||'';
+    const isThought=tipo.startsWith('thought_');
+    const isContagion=tipo==='contagio_pasivo';
+    const isApertura=tipo.startsWith('apertura_'); // docente habla al grupo
+
+    const displayText=(isThought?t.emotion_note:t.speech)||'';
+    if(!displayText) continue;
+
+    lastSpeechByAgent[t.agente_id||'']=displayText;
+    const ag=agMap[t.agente_id];
+    const emo=normE(t.emocion_post||ag?.emocion_dominante||'neutral');
+    const col=ag?.rol==='teacher'?'#e2eaff':EC[emo];
+
+    // Actualizar emoción del nodo (siempre, incluso en pensamientos)
+    if(ag && ag.rol!=='teacher'){
+      updateNodeEmo(ag.id, emo, t.control_post||ag.control||50);
+      agMap[ag.id]={...agMap[ag.id],emocion_dominante:emo,control:t.control_post||ag.control};
+    }
+
+    // ── ARISTAS ──────────────────────────────────────────────────────────────
+    if(!isThought && ag && nodePos[ag.id]){
+      const posOrig=nodePos[ag.id];
+
+      if(isContagion){
+        // Línea discontinua SIN punta → solo influencia emocional
+        Object.values(agMap)
+          .filter(a=>a.id!==ag.id&&a.rol==='student')
+          .slice(0,3)
+          .forEach(target=>{
+            const posDest=nodePos[target.id];
+            if(posDest) addEdge(posOrig.x,posOrig.y,posDest.x,posDest.y,
+              'contagion',col,true,0.4,3800,false); // false = sin punta
+          });
+
+      } else if(isApertura){
+        // Docente habla al grupo → círculo pulsante, sin arista
+        pulseDocGroup();
+
+      } else if(ag.rol==='teacher'){
+        // Docente habla a alumno concreto → buscar quién
+        pulseNode(ag.id, col);
+        const stu=Object.values(agMap).filter(a=>a.rol==='student');
+        const target=stu.find(a=>displayText.includes(a.nombre));
+        if(target){
+          const posDest=nodePos[target.id];
+          if(posDest) addEdge(posOrig.x,posOrig.y,posDest.x,posDest.y,
+            'solid','#e2eaff',false,0.9,3500,true); // true = con punta
+        }
+
+      } else {
+        // Alumno habla → detectar destino
+        pulseNode(ag.id, col);
+        const docente=Object.values(agMap).find(a=>a.rol==='teacher');
+        const companer=Object.values(agMap).find(
+          a=>a.rol==='student'&&a.id!==ag.id&&displayText.includes(a.nombre)
+        );
+        const destAg=companer||docente;
+        if(destAg){
+          const posDest=nodePos[destAg.id];
+          if(posDest){
+            const edgeCol=companer?'#60d4f0':col;
+            addEdge(posOrig.x,posOrig.y,posDest.x,posDest.y,
+              'solid',edgeCol,!!companer,0.85,3500,true); // true = con punta
+          }
+        }
+      }
+    }
+
+    // ── BOCADILLO EN EL GRAFO ────────────────────────────────────────────────
+    if(ag && nodePos[ag.id]){
+      const isAction=!isThought&&(displayText.startsWith('[')||displayText.startsWith('*'));
+      const bubTipo=isThought?'thought':isAction?'action':(ag.rol==='teacher'?'teacher':'speech');
+      showBubble(ag.id, displayText, bubTipo);
+    }
+
+    // ── MENSAJE EN CHAT (siempre, incluyendo pensamientos) ────────────────────
+    const msgEl=mkMsg(t,ag,isThought,displayText);
+    if(msgEl){
+      ['rp-feed','cf-main'].forEach((fid,i)=>{
+        const feed=document.getElementById(fid);
+        if(!feed) return;
+        feed.querySelector('.sysmsg:first-child')?.remove();
+        feed.appendChild(i===0?msgEl:msgEl.cloneNode(true));
+        feed.scrollTop=feed.scrollHeight;
+      });
+      chatCnt++;
+      document.getElementById('chat-cnt').textContent=chatCnt+' turns';
+    }
+  }
+}
+
+function mkMsg(t,ag,isThought,displayText){
+  if(!displayText) return null;
+  const isAction=!isThought&&(displayText.startsWith('[')||displayText.startsWith('*'));
+  const agF=ag||{rol:t.rol,nombre:t.nombre,emoji:t.emoji};
+  const isT=agF.rol==='teacher';
+  const emo=normE(t.emocion_post||'neutral');
+  const col=isT?'#3a5fbf':EC[emo];
+  const div=document.createElement('div');
+  div.className=`msg${isT?' ist':''}`;
+  div.innerHTML=`<div class="mav">${agF.emoji||'🧑'}</div>
+    <div class="mbody">
+      <div class="mwho" style="color:${col}">
+        ${agF.nombre}
+        ${!isT?`<span class="metag" style="background:${hexA(col,.15)};color:${col};border:1px solid ${hexA(col,.3)}">${EI[emo]} ${cap(emo)}</span>`:''}
+      </div>
+      <div class="mbubble${isThought?' mthought':isAction?' maction':''}">${isThought?'💭 ':isAction?'⚡ ':''}${displayText}</div>
+    </div>`;
+  return div;
+}
+
+function addSysMsg(txt){
+  ['rp-feed','cf-main'].forEach(fid=>{
+    const f=document.getElementById(fid);if(!f)return;
+    const d=document.createElement('div');d.className='sysmsg';d.textContent=txt;
+    f.appendChild(d);f.scrollTop=f.scrollHeight;
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  MONITOR RETRO
+// ════════════════════════════════════════════════════════
+let monQueue=[], monBusy=false;
+
+function monLog(type, msg){
+  monQueue.push({type,msg});
+  if(!monBusy) drainMon();
+}
+
+function drainMon(){
+  if(!monQueue.length){monBusy=false;return;}
+  monBusy=true;
+  const {type,msg}=monQueue.shift();
+  const body=document.getElementById('mon-body');
+  // Quitar cursor anterior
+  body.querySelectorAll('.mcursor').forEach(c=>c.remove());
+
+  const ts=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className='mline';
+
+  const tsEl=document.createElement('span');
+  tsEl.className='mts';tsEl.textContent=ts;
+
+  const tagEl=document.createElement('span');
+  const msgEl=document.createElement('span');
+
+  if(type==='alert'){
+    tagEl.className='mtag-alert';tagEl.textContent='[ALERT]';
+    msgEl.className='mmsg-alert';
+  }else if(type==='system'){
+    tagEl.className='mtag-sys';tagEl.textContent='[SYSTEM]';
+    msgEl.className='mmsg-sys';
+  }else{
+    tagEl.className='mtag-teach';tagEl.textContent='[TEACHER]';
+    msgEl.className='mmsg-teach';
+  }
+
+  // Efecto typewriter
+  line.appendChild(tsEl);line.appendChild(tagEl);line.appendChild(msgEl);
+  body.appendChild(line);
+  body.scrollTop=body.scrollHeight;
+
+  let i=0;
+  const cursor=document.createElement('span');cursor.className='mcursor';
+  msgEl.appendChild(cursor);
+
+  const type_=()=>{
+    if(i<msg.length){
+      msgEl.insertBefore(document.createTextNode(msg[i]),cursor);
+      i++;
+      setTimeout(type_,18+Math.random()*12);
+    }else{
+      cursor.remove();
+      setTimeout(drainMon,400);
+    }
+  };
+  type_();
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER DOCENTE & DECISIONES
+// ════════════════════════════════════════════════════════
+function sdtBar(lbl,val,col){
+  return `<div class="sdt-row"><div class="sdt-lbl">${lbl}</div><div class="sdt-bg"><div class="sdt-fill" style="width:${Math.round(val)}%;background:${col}"></div></div><div class="sdt-val">${Math.round(val)}</div></div>`;
+}
+
+function renderDocente(data){
+  if(!data.docente) return;
+  const d=data.docente;
+  document.getElementById('card-doc').innerHTML=`<div class="ct">Teacher agent</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:22px">${d.emoji||'👩'}</span>
+      <div><div style="font-size:13px;font-weight:600">${d.nombre}</div>
+      <div style="color:var(--mut);font-size:10px">${(d.descripcion||'').slice(0,80)}...</div></div>
+    </div>
+    ${sdtBar('SDT Autonomy',d.sdt_autonomia_docente||50,'#4ddf8a')}
+    ${sdtBar('SDT Structure',d.sdt_estructura_docente||65,'#f5b942')}
+    ${sdtBar('SDT Involvement',d.sdt_implicacion_docente||60,'#4a9eff')}
+    ${sdtBar('Motivation',d.motivacion||65,'#b48aff')}
+    ${sdtBar('Stress',d.estres||40,'#ff5a5a')}`;
+
+  const decs=data.decisiones||[];
+  if(!decs.length){
+    document.getElementById('dec-list').innerHTML='<div style="color:var(--mut);font-size:11px">No decisions yet.</div>';
+    return;
+  }
+  document.getElementById('dec-list').innerHTML=decs.slice(-5).reverse().map(dec=>{
+    // Monitor — solo para decisiones nuevas
+    if((dec.decision==='acepta'||dec.decision==='modifica'||dec.decision==='rechaza')&&dec.id&&dec.id!==lastDecId){
+      lastDecId=dec.id;
+      // Emitir al monitor
+      const alertTipo=dec.alerta_tipo||'';
+      const alumnos=dec.alerta_descripcion||'';
+      monLog('alert', `${cap(alertTipo.replace(/_/g,' '))} · ${alumnos.slice(0,50)}`);
+      monLog('system', dec.propuesta_descripcion?.slice(0,60)||'Proposal generated');
+      const fundText=dec.propuesta_fundamento?.slice(0,55)||'';
+      if(fundText) monLog('system', fundText);
+      const decIcon={acepta:'ACCEPTS',rechaza:'REJECTS',modifica:'MODIFIES'}[dec.decision]||dec.decision.toUpperCase();
+      monLog('teacher', `${decIcon} · "${(dec.justificacion||'').slice(0,50)}"`);
+    }
+    const bc={acepta:'dba',rechaza:'dbr',modifica:'dbm'};
+    const ic={acepta:'✓ Accepts',rechaza:'✗ Rejects',modifica:'↻ Modifies'};
+    return `<div class="dcard">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:500;color:#c0c8e0">${(dec.propuesta_tipo||'').replace(/_/g,' ')}</span>
+        <span class="dbadge ${bc[dec.decision]||'dba'}">${ic[dec.decision]||dec.decision}</span>
+        <span style="font-size:9px;color:var(--hint);margin-left:auto">T${dec.turno}</span>
+      </div>
+      <div style="font-size:10px;color:var(--mut);line-height:1.5">${dec.justificacion||''}</div>
+      <div style="font-size:9px;color:var(--hint);margin-top:3px">Prior: ${Math.round(dec.prior_sesgo||50)}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  MÉTRICAS
+// ════════════════════════════════════════════════════════
+function renderDistChart(){
+  const ctx=document.getElementById('dist-chart')?.getContext('2d');
+  if(!ctx||!sesionId) return;
+  fetch(`${API}/api/agentes?id=${sesionId}`).then(r=>r.json()).then(data=>{
+    const res=data.resumen_emocional?.distribucion||{};
+    const keys=Object.keys(res),vals=Object.values(res);
+    const labels=keys.map(k=>cap(normE(k)));
+    const cols=keys.map(k=>EC[normE(k)]||'#4a9eff');
+    if(distChart){distChart.data.labels=labels;distChart.data.datasets[0].data=vals;distChart.data.datasets[0].backgroundColor=cols;distChart.update();return;}
+    distChart=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:cols,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#6070a0',font:{size:10},padding:8}}}}});
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  POLLING
+// ════════════════════════════════════════════════════════
+function setStatus(type,txt){
+  const dot=document.getElementById('sdot');
+  dot.className='sdot'+(type==='live'?' live':'');
+  document.getElementById('stxt').textContent=txt;
+}
+
+function resetSession(){
+  ultimoTurno=0;chatCnt=0;grupos=[];nodePos={};
+  renderedKeys.clear();
+  lastSpeechByAgent={} // limpiar último discurso
+  const gN=document.getElementById('g-nodes');
+  const gE=document.getElementById('g-edges');
+  if(gN) gN.innerHTML='';
+  if(gE) gE.innerHTML='';
+  // Limpiar bocadillos
+  clearAllBubbles();
+  document.getElementById('graph-empty').style.display='flex';
+  ['rp-feed','cf-main'].forEach(id=>{
+    const f=document.getElementById(id);
+    if(f) f.innerHTML='<div class="sysmsg">Session starting...</div>';
+  });
+  document.getElementById('chat-cnt').textContent='0 turns';
+  // Limpiar caché de afinidad
+  affCache={processed:new Set(),mat:null,alumnos:null,id2idx:{}};
+  affinityData=null;
+}
+
+async function poll(){
+  try{
+    const sr=await fetch(`${API}/api/sesion/actual`);
+    const sd=await sr.json();
+    if(sd.error){
+      setStatus('wait','Ready · No session');
+      try{
+        const ds=await fetch(`${API}/api/demo/status`);
+        const dd=await ds.json();
+        if(dd.running) setStatus('live','Demo starting...');
+      }catch(e){}
+      return;
+    }
+
+    sesionId=sd.id;
+    if(sesionId!==lastSesionId){
+      resetSession(); lastSesionId=sesionId; lastDecId=null;
+      document.getElementById('btn-replay').style.display='inline-block';
+      document.getElementById('btn-event').style.display='inline-block';
+      document.getElementById('mon-session').textContent='SESSION '+sesionId.slice(0,6).toUpperCase();
+      if(demoActive) monLog('system','Session ready · CVT + SDT active');
+    }
+
+    const live=sd.estado==='simulando';
+    const done=sd.estado==='completada';
+    setStatus(live?'live':'wait',
+      live?`Simulating · Phase ${faseDisplay}`:
+      done?'Session completed':'Initialising...');
+    // Al completar: resetear botones
+    if(done){
+      const btnD=document.getElementById('btn-demo');
+      if(btnD&&btnD.textContent==='● Running'){
+        btnD.textContent='↺ New demo';
+        btnD.onclick=()=>{demoActive=false;resetSession();showConfig();};
+      }
+      document.getElementById('btn-pause').style.display='none';
+    }
+
+    const cfg=sd.config_resumen||{};
+    document.getElementById('chip-ses').textContent=(cfg.nombre||'').slice(0,22)||sd.id.slice(0,8);
+    const totalFases=cfg.fases||4;
+    const faseDisplay=Math.min((sd.fase_actual||0)+1, totalFases);
+    document.getElementById('chip-fase').textContent=`Phase ${faseDisplay}/${totalFases}`;
+    document.getElementById('chip-turno').textContent=`Turn ${sd.turno_actual||0}`;
+    document.getElementById('chip-al').textContent=`${cfg.n_alumnos||'?'} students`;
+    faseActual=sd.fase_actual||0;
+
+    if(sd.config_json){
+      try{
+        const cfgF=JSON.parse(sd.config_json);
+        sessionStorage.setItem('fases',JSON.stringify(cfgF.sesion?.fases||[]));
+        const f=(cfgF.sesion?.fases||[])[faseActual];
+        if(f) document.getElementById('phase-lbl').textContent=
+          `Phase ${faseActual+1} · ${f.descripcion||f.tipo}${f.pizarra?' · '+f.pizarra:''}`;
+      }catch(e){}
+    }
+
+    // Solo renderizar si el usuario ha iniciado la demo
+    if(!demoActive) return;
+
+    // Fetch agentes + turnos + docente en paralelo
+    const [ar,cr,dr] = await Promise.all([
+      fetch(`${API}/api/agentes?id=${sesionId}`),
+      fetch(`${API}/api/chat?id=${sesionId}&desde=${ultimoTurno}&limite=4`),
+      fetch(`${API}/api/docente?id=${sesionId}`)
+    ]);
+    const [ad,cd,dd] = await Promise.all([ar.json(),cr.json(),dr.json()]);
+
+    // Agentes
+    if(ad.agentes?.length>0){
+      ad.agentes.forEach(a=>agMap[a.id]=a);
+      if(Object.keys(nodePos).length===0) nodePos=buildNodePositions(ad.agentes);
+      renderGraph(ad.agentes);
+      const stu=ad.agentes.filter(a=>a.rol==='student');
+      const ctrl=Math.round(stu.reduce((s,a)=>s+(parseFloat(a.control)||50),0)/Math.max(stu.length,1));
+      const val=Math.round(stu.reduce((s,a)=>s+(parseFloat(a.valor)||50),0)/Math.max(stu.length,1));
+      document.getElementById('m-ctrl').textContent=ctrl;
+      document.getElementById('m-val').textContent=val;
+    }
+
+    // Turnos nuevos
+    if(cd.turnos?.length>0 && Object.keys(nodePos).length>0){
+      renderTurnos(cd.turnos);
+      ultimoTurno=Math.max(...cd.turnos.map(t=>t.turno))+1;
+    }
+
+    // Docente
+    renderDocente(dd);
+
+    // Métricas (no crítico — fetch separado y no bloqueante)
+    fetch(`${API}/api/metricas/sesion?id=${sesionId}`)
+      .then(r=>r.json()).then(md=>{
+        if(md.acceptance_rate!==undefined) document.getElementById('m-acc').textContent=`${Math.round(md.acceptance_rate*100)}%`;
+        if(md.total_decisiones!==undefined) document.getElementById('m-prop').textContent=md.total_decisiones;
+      }).catch(()=>{});
+
+    // Afinidad: actualizar en background si la pestaña está visible o hay datos nuevos
+    if(cd.turnos?.length>0){
+      if(document.getElementById('view-affinity')?.classList.contains('on')){
+        loadAffinity(); // pestaña abierta — refrescar
+      } else {
+        buildAffinityCache(cd.turnos); // pestaña cerrada — acumular en caché silenciosamente
+      }
+    }
+
+  }catch(err){
+    setStatus('wait','Connection error');
+  }
+}
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  poll();
+  pollTimer=setInterval(poll,1500);
+}
+
+function startFastPolling(){
+  // Poll rápido al inicio hasta que aparezcan los agentes, luego normal
+  if(pollTimer) clearInterval(pollTimer);
+  let fastCount=0;
+  const fast=async()=>{
+    await poll();
+    fastCount++;
+    if(Object.keys(nodePos).length>0 || fastCount>20){
+      // Agentes cargados → volver a ritmo normal
+      clearInterval(fastTimer);
+      pollTimer=setInterval(poll,1500);
+    }
+  };
+  fast();
+  const fastTimer=setInterval(fast,600);
+  // Guardar ref para poder limpiarla
+  pollTimer=fastTimer;
+}
+
+// ════════════════════════════════════════════════════════
+//  CONTROLES
+// ════════════════════════════════════════════════════════
+async function launchDemo(){
+  // Siempre mostrar configuración para confirmar antes de iniciar
+  showConfig();
+}
+
+async function startDemo(isStep=false){
+  stepMode=false;
+  const btnD=document.getElementById('btn-demo');
+  btnD.textContent='⟳';btnD.disabled=true;
+  demoActive=true;
+  try{
+    // Leer pausa de la configuración guardada
+    let pausaVal=2.5;
+    try{
+      const savedCfg=JSON.parse(sessionStorage.getItem('classroom_config')||'{}');
+      pausaVal=parseFloat(savedCfg.pausa)||2.5;
+    }catch(e){}
+    const r=await fetch(`${API}/api/demo/start`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pausa:pausaVal,step_mode:false})
+    });
+    const d=await r.json();
+    if(d.ok){
+      btnD.textContent='● Running';
+      btnD.disabled=false;
+      document.getElementById('btn-pause').style.display='inline-block';
+      monLog('system','Demo launched · loading agents...');
+      // Mostrar mensaje y arrancar poll rápido
+      const emp=document.getElementById('graph-empty');
+      if(emp){
+        emp.style.display='flex';
+        emp.innerHTML='<div class="ge-ico" style="font-size:28px">⟳</div><div class="ge-ttl" style="color:#4a9eff">Loading agents...</div><div class="ge-sub">Starting simulation</div>';
+      }
+      startFastPolling(); // poll cada 600ms hasta que aparezcan los agentes
+    }else{
+    btnD.textContent='▶ Start Demo';btnD.disabled=false;
+    monLog('system','API returned error — check api.py is running');
+  }
+  }catch(e){
+    btnD.textContent='▶ Start Demo';btnD.disabled=false;demoActive=false;
+    monLog('alert','Cannot reach API — '+e.message);
+    monLog('system','Make sure: python api.py --port 8080');
+  }
+}
+
+
+async function togglePause(){
+  pausado=!pausado;
+  await fetch(`${API}/api/control`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:pausado?'pausa':'continua'})}).catch(()=>{});
+  const btn=document.getElementById('btn-pause');
+  btn.textContent=pausado?'▶ Resume':'⏸ Pause';
+  if(pausado) btn.classList.add('btn-amb'); else btn.classList.remove('btn-amb');
+}
+
+async function toggleReplay(){
+  if(!sesionId){addSysMsg('No session to replay');return;}
+  const spd=prompt('Seconds per turn:','2');
+  if(!spd) return;
+  const ms=Math.max(500,parseFloat(spd)*1000);
+  const r=await fetch(`${API}/api/chat?id=${sesionId}&desde=0&limite=500`);
+  const d=await r.json();
+  const turnos=(d.turnos||[]).filter(t=>t.speech||t.emotion_note);
+  if(!turnos.length){addSysMsg('No turns to replay');return;}
+  // Limpiar
+  document.getElementById('g-edges').innerHTML='';
+  renderedKeys.clear();chatCnt=0;
+  ['rp-feed','cf-main'].forEach(id=>{const f=document.getElementById(id);if(f)f.innerHTML='';});
+  document.getElementById('chat-cnt').textContent='0 turns';
+  addSysMsg(`▶ Replaying ${turnos.length} turns...`);
+  goTab('graph');
+  const bar=document.createElement('div');
+  bar.style.cssText='position:fixed;top:0;left:0;height:3px;background:#4ddf8a;z-index:999;transition:width .3s';
+  document.body.appendChild(bar);
+  let i=0;
+  const next=()=>{
+    if(i>=turnos.length){bar.remove();addSysMsg('✓ Replay complete');return;}
+    bar.style.width=`${Math.round(i/turnos.length*100)}%`;
+    renderTurnos([turnos[i]]);i++;
+    setTimeout(next,ms);
+  };
+  next();
+}
+
+function goTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',['graph','chat','docente','metricas'][i]===id));
+  document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='none';});
+  const v=document.getElementById('view-'+id);
+  v.classList.add('on');v.style.display='flex';
+  if(id==='metricas') renderDistChart();
+}
+
+function openModal(){document.getElementById('moverlay').style.display='flex';setTimeout(()=>document.getElementById('ev-in').focus(),100);}
+function closeModal(){document.getElementById('moverlay').style.display='none';document.getElementById('ev-in').value='';}
+async function _sendEvt(txt){
+  if(!txt||!sesionId) return;
+  await fetch(`${API}/api/evento`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({descripcion:txt,sesion_id:sesionId})}).catch(()=>{});
+  monLog('system',`Event injected: "${txt.slice(0,50)}"`);
+}
+async function sendEvent(){const i=document.getElementById('inj-in');await _sendEvt(i.value.trim());i.value='';}
+async function sendEventModal(){const i=document.getElementById('ev-in');await _sendEvt(i.value.trim());closeModal();}
+
+// ════════════════════════════════════════════════════════
+//  RESIZE OBSERVER — reposicionar nodos al redimensionar
+// ════════════════════════════════════════════════════════
+let resizeDebounce=null;
+if(window.ResizeObserver){
+  const ro=new ResizeObserver(()=>{
+    clearTimeout(resizeDebounce);
+    resizeDebounce=setTimeout(()=>{
+      if(Object.keys(agMap).length===0) return;
+      nodePos=buildNodePositions(Object.values(agMap));
+      renderGraph(Object.values(agMap));
+    },150);
+  });
+  const roTarget=document.getElementById('graph-area')||document.getElementById('graph-pane');
+  ro.observe(roTarget);
+}
+
+
+
+// ════════════════════════════════════════════════════════
+//  AFFINITY
+// ════════════════════════════════════════════════════════
+let affinityData=null;
+let affCurrentView='heat';
+let affCache={processed:new Set(), mat:null, alumnos:null};
+
+function buildAffinityCache(turnos){
+  // Acumular interacciones en caché sin re-leer toda la BD
+  if(!affCache.alumnos){
+    const stu=Object.values(agMap).filter(a=>a.rol==='student');
+    if(!stu.length) return;
+    affCache.alumnos=stu;
+    const n=stu.length;
+    affCache.mat=Array.from({length:n},()=>Array.from({length:n},()=>({count:0,emoSum:0,contagion:0})));
+    affCache.id2idx={};stu.forEach((a,i)=>affCache.id2idx[a.id]=i);
+  }
+  const {alumnos,mat,id2idx,processed}=affCache;
+  const emoScore={enjoyment:1,pride:0.8,neutral:0,boredom:-0.3,anxiety:-0.6,hopelessness:-1};
+  for(const t of turnos){
+    const k=`${t.fase}-${t.turno}-${t.agente_id}`;
+    if(processed.has(k)) continue;
+    processed.add(k);
+    const srcIdx=id2idx[t.agente_id];
+    if(srcIdx===undefined) continue;
+    const speech=t.speech||'';
+    const emo=normE(t.emocion_post||'neutral');
+    const score=emoScore[emo]||0;
+    const isContagion=t.tipo_interaccion==='contagio_pasivo';
+    if(isContagion){
+      alumnos.forEach((_,j)=>{if(j!==srcIdx) mat[srcIdx][j].contagion++;});
+    } else {
+      const mentioned=alumnos.find((a,j)=>j!==srcIdx&&speech.includes(a.nombre));
+      if(mentioned){
+        const dstIdx=id2idx[mentioned.id];
+        if(dstIdx!==undefined){mat[srcIdx][dstIdx].count++;mat[srcIdx][dstIdx].emoSum+=score;}
+      }
+    }
+  }
+}
+
+function affView(v){
+  affCurrentView=v;
+  document.getElementById('aff-btn-heat').classList.toggle('on',v==='heat');
+  document.getElementById('aff-btn-net').classList.toggle('on',v==='net');
+  document.getElementById('aff-heat').style.display=v==='heat'?'block':'none';
+  document.getElementById('aff-net').style.display=v==='net'?'block':'none';
+  if(v==='net'&&affinityData) renderAffinityNet(affinityData);
+}
+
+async function loadAffinity(){
+  if(!sesionId){
+    document.getElementById('aff-heat').innerHTML='<div class="aff-empty">No session active. Start a demo first.</div>';
+    return;
+  }
+
+  // Usar caché si ya tiene datos; si no, leer toda la BD
+  if(affCache.mat&&affCache.alumnos){
+    // Caché disponible — renderizar directamente
+    const {alumnos,mat}=affCache;
+    affinityData={alumnos,mat,n:alumnos.length};
+    renderAffinityHeat(affinityData);
+    if(affCurrentView==='net') renderAffinityNet(affinityData);
+    renderAffinityLegend();
+    return;
+  }
+
+  // Sin caché — leer toda la BD (primera vez o tras reset)
+  try{
+    const [cr,ar]=await Promise.all([
+      fetch(`${API}/api/chat?id=${sesionId}&desde=0&limite=500`),
+      fetch(`${API}/api/agentes?id=${sesionId}`)
+    ]);
+    const [cd,ad]=await Promise.all([cr.json(),ar.json()]);
+    const alumnos=(ad.agentes||[]).filter(a=>a.rol==='student');
+    if(!alumnos.length){
+      document.getElementById('aff-heat').innerHTML='<div class="aff-empty">No student data yet.</div>';
+      return;
+    }
+    // Inicializar caché y procesar todos los turnos
+    affCache.alumnos=alumnos;
+    const n=alumnos.length;
+    affCache.mat=Array.from({length:n},()=>Array.from({length:n},()=>({count:0,emoSum:0,contagion:0})));
+    affCache.id2idx={};alumnos.forEach((a,i)=>affCache.id2idx[a.id]=i);
+    buildAffinityCache(cd.turnos||[]);
+    affinityData={alumnos,mat:affCache.mat,n};
+    renderAffinityHeat(affinityData);
+    if(affCurrentView==='net') renderAffinityNet(affinityData);
+    renderAffinityLegend();
+  }catch(e){
+    document.getElementById('aff-heat').innerHTML=`<div class="aff-empty">Error: ${e.message}</div>`;
+  }
+}
+
+function emoColor(score,alpha=1){
+  if(score>0.5) return `rgba(77,223,138,${alpha})`;
+  if(score>0)   return `rgba(74,158,255,${alpha})`;
+  if(score>-0.3)return `rgba(107,114,128,${alpha})`;
+  if(score>-0.6)return `rgba(245,185,66,${alpha})`;
+  return `rgba(255,90,90,${alpha})`;
+}
+
+// ── HEATMAP ───────────────────────────────────────────────────────────────────
+function renderAffinityHeat({alumnos,mat,n}){
+  const pane=document.getElementById('aff-heat');
+  const maxCount=Math.max(1,...mat.flat().map(c=>c.count));
+
+  // Header row con nombres en vertical
+  let html='<div class="heat-wrap"><div class="heat-row"><div class="heat-lbl"></div>';
+  alumnos.forEach(a=>{
+    html+=`<div class="heat-lbl top" style="color:${EC[normE(a.emocion_dominante||'neutral')]}">${a.nombre}</div>`;
+  });
+  html+='</div>';
+
+  // Data rows
+  alumnos.forEach((src,i)=>{
+    html+=`<div class="heat-row"><div class="heat-lbl" style="color:${EC[normE(src.emocion_dominante||'neutral')]}">${src.emoji} ${src.nombre}</div>`;
+    alumnos.forEach((dst,j)=>{
+      if(i===j){
+        html+=`<div class="heat-cell self">—</div>`;
+        return;
+      }
+      const {count,emoSum,contagion}=mat[i][j];
+      const total=count+Math.round(contagion*0.3);
+      if(total===0){
+        html+=`<div class="heat-cell" style="background:rgba(255,255,255,.03);color:#2a3a5a">·</div>`;
+        return;
+      }
+      const score=count>0?emoSum/count:0;
+      const intensity=Math.min(1,total/maxCount);
+      const bg=emoColor(score,0.15+intensity*0.7);
+      const border=emoColor(score,0.4+intensity*0.4);
+      const txt=emoColor(score,1);
+      html+=`<div class="heat-cell" style="background:${bg};border:1px solid ${border};color:${txt}">
+        ${count>0?count:'·'}
+        <div class="heat-tip">${src.nombre} → ${dst.nombre}<br>Direct: ${count} · Contagion: ${contagion}<br>Emotion: ${score>=0?'+':''}${score.toFixed(2)}</div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  pane.innerHTML=html;
+}
+
+// ── NETWORK (force-directed con D3) ───────────────────────────────────────────
+function renderAffinityNet({alumnos,mat,n}){
+  const svgEl=document.getElementById('aff-svg');
+  const pane=document.getElementById('aff-net');
+  const W=pane.offsetWidth||600, H=pane.offsetHeight||400;
+  svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
+
+  // Limpiar
+  while(svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+  // Construir links
+  const links=[];
+  const maxCount=Math.max(1,...mat.flat().map(c=>c.count));
+  alumnos.forEach((src,i)=>{
+    alumnos.forEach((dst,j)=>{
+      if(i>=j) return;
+      const fwd=mat[i][j].count, bwd=mat[j][i].count;
+      const total=fwd+bwd;
+      if(total===0) return;
+      const score=(mat[i][j].emoSum+mat[j][i].emoSum)/Math.max(1,fwd+bwd);
+      links.push({source:i,target:j,count:total,score,strength:total/maxCount});
+    });
+  });
+
+  // Layout simple circular + spring simulado (sin D3 — manual)
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.36;
+  const nodes=alumnos.map((a,i)=>{
+    const angle=(2*Math.PI*i/n)-Math.PI/2;
+    return {id:i,a,x:cx+R*Math.cos(angle),y:cy+R*Math.sin(angle)};
+  });
+
+  // Dibujar links
+  const gLinks=document.createElementNS('http://www.w3.org/2000/svg','g');
+  links.forEach(l=>{
+    const s=nodes[l.source],t=nodes[l.target];
+    const col=l.score>0.3?'rgba(77,223,138':l.score>-0.3?'rgba(74,158,255':'rgba(255,90,90';
+    const w=1+l.strength*4;
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',s.x);line.setAttribute('y1',s.y);
+    line.setAttribute('x2',t.x);line.setAttribute('y2',t.y);
+    line.setAttribute('stroke',`${col},${0.2+l.strength*0.6})`);
+    line.setAttribute('stroke-width',w);
+    gLinks.appendChild(line);
+  });
+  svgEl.appendChild(gLinks);
+
+  // Dibujar nodos
+  const gNodes=document.createElementNS('http://www.w3.org/2000/svg','g');
+  nodes.forEach(({a,x,y})=>{
+    const emo=normE(a.emocion_dominante||'neutral');
+    const col=EC[emo];
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',x);circle.setAttribute('cy',y);circle.setAttribute('r',20);
+    circle.setAttribute('fill',`${col}18`);circle.setAttribute('stroke',col);
+    circle.setAttribute('stroke-width','2');
+    g.appendChild(circle);
+    const em=document.createElementNS('http://www.w3.org/2000/svg','text');
+    em.setAttribute('x',x);em.setAttribute('y',y+5);
+    em.setAttribute('text-anchor','middle');em.setAttribute('font-size','16');
+    em.textContent=a.emoji||'🧑';
+    g.appendChild(em);
+    const nm=document.createElementNS('http://www.w3.org/2000/svg','text');
+    nm.setAttribute('x',x);nm.setAttribute('y',y+32);
+    nm.setAttribute('text-anchor','middle');nm.setAttribute('font-size','8.5');
+    nm.setAttribute('fill',col);nm.setAttribute('font-weight','700');
+    nm.setAttribute('font-family','-apple-system,sans-serif');
+    nm.textContent=a.nombre;
+    g.appendChild(nm);
+    gNodes.appendChild(g);
+  });
+  svgEl.appendChild(gNodes);
+}
+
+function renderAffinityLegend(){
+  const leg=document.getElementById('aff-legend');
+  leg.innerHTML=`
+    <div class="aff-leg-item"><div class="aff-leg-dot" style="background:#4ddf8a"></div>Positive interaction</div>
+    <div class="aff-leg-item"><div class="aff-leg-dot" style="background:#4a9eff"></div>Neutral</div>
+    <div class="aff-leg-item"><div class="aff-leg-dot" style="background:#ff5a5a"></div>Anxious / negative</div>
+    <div class="aff-leg-item" style="margin-left:auto;font-size:9px;color:var(--hint)">Cell value = direct interactions · Color = emotional valence</div>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════
+let generatedStudents = [];
+
+const QS_SUBJECTS={
+  "nat":["Mathematics","Physics","Chemistry","Statistics & Operational Research","Computer Science & Information Systems","Environmental Sciences","Geography","Earth & Marine Sciences"],
+  "eng":["Electrical & Electronic Engineering","Mechanical Engineering","Civil & Structural Engineering","Chemical Engineering","Computer Science & Information Systems","Architecture","Materials Science"],
+  "lss":["Biological Sciences","Medicine","Nursing","Psychology","Sports-related Subjects","Anatomy & Physiology","Pharmacy & Pharmacology","Dentistry"],
+  "ssh":["Education & Training","Sociology","Economics & Econometrics","Politics & International Studies","Law & Legal Studies","Business & Management Studies","Accounting & Finance","Geography","Communication & Media Studies"],
+  "art":["Linguistics","English Language & Literature","History","Philosophy","Art & Design","Music","Performing Arts","Modern Languages","Theology, Divinity & Religious Studies","Archaeology"]
+};
+
+const ISCED_LABELS={
+  "0":"Early childhood (0–5)","1":"Primary (6–11)","2":"Lower secondary (12–15)",
+  "3":"Upper secondary (16–18)","4":"Post-secondary non-tertiary",
+  "5":"Short-cycle tertiary","6":"Bachelor's","7":"Master's","8":"Doctoral"
+};
+
+function updateQsSubjects(){
+  const area=document.getElementById('cfg-qs-area')?.value||'nat';
+  const sel=document.getElementById('cfg-qs-subject');
+  if(!sel) return;
+  const subjects=QS_SUBJECTS[area]||[];
+  sel.innerHTML=subjects.map((s,i)=>
+    `<option value="${s.toLowerCase().replace(/ /g,'_')}"${i===0?' selected':''}>${s}</option>`
+  ).join('');
+}
+
+function updateCourseLabel(){} // removed
+
+function showConfig(){
+  document.getElementById('config-overlay').style.display='flex';
+  cfgTab('context');
+}
+function closeConfig(){
+  document.getElementById('config-overlay').style.display='none';
+}
+function cfgTab(id){
+  document.querySelectorAll('.cfg-tab').forEach((t,i)=>{
+    t.classList.toggle('on',['context','teacher','students','session'][i]===id);
+  });
+  document.querySelectorAll('.cfg-section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('cfg-'+id).classList.add('on');
+}
+function loadDemo(){
+  document.getElementById('cfg-isced').value='2';
+  document.getElementById('cfg-qs-area').value='nat';
+  updateQsSubjects();
+  setTimeout(()=>{
+    const sel=document.getElementById('cfg-qs-subject');
+    if(sel) [...sel.options].forEach(o=>{o.selected=o.text==='Mathematics';});
+  },50);
+  document.getElementById('cfg-topic').value='Ecuaciones de segundo grado';
+  document.getElementById('cfg-tname').value='Prof. García';
+  document.getElementById('cfg-tage').value='41';
+  document.getElementById('cfg-tdesc').value='Profesora metódica y exigente. Sigue el libro con rigor. Le cuesta adaptar el ritmo cuando la clase se dispersa.';
+  document.getElementById('cfg-sdt-aut').value='42';
+  document.getElementById('cfg-sdt-str').value='80';
+  document.getElementById('cfg-sdt-inv').value='58';
+  document.getElementById('cfg-tmot').value='64';
+  document.getElementById('cfg-nstu').value='12';
+  document.getElementById('cfg-profiles').value='Ansiedad severa, Altas capacidades, TDAH, Barrera lingüística';
+  document.getElementById('cfg-age').value='14';
+  document.getElementById('cfg-cohesion').value='58';
+  document.getElementById('cfg-pausa').value='3.0';
+  document.getElementById('cfg-threshold').value='35';
+  document.getElementById('cfg-phases').value=`lecture: Explicación de la fórmula cuadrática
+question: Preguntas sobre el discriminante
+group_work: Resolución en grupos
+correction: Corrección colectiva y cierre`;
+  generatedStudents=[];
+  document.getElementById('student-preview').innerHTML='';
+  document.getElementById('gen-status').textContent='Demo defaults loaded.';
+}
+
+async function generateStudents(){
+  const btn=document.getElementById('btn-gen-students');
+  const status=document.getElementById('gen-status');
+  const icon=document.getElementById('gen-icon');
+  btn.disabled=true; icon.textContent='⟳'; status.textContent='Generating with Claude...';
+
+  const isced=document.getElementById('cfg-isced').value;
+  const iscedLabel=ISCED_LABELS[isced]||'';
+  const qsArea=document.getElementById('cfg-qs-area')?.options[document.getElementById('cfg-qs-area').selectedIndex]?.text||'';
+  const qsSubject=document.getElementById('cfg-qs-subject')?.options[document.getElementById('cfg-qs-subject').selectedIndex]?.text||'';
+  const topic=document.getElementById('cfg-topic').value;
+  const lang=document.getElementById('cfg-lang')?.value||'es';
+  const nStu=parseInt(document.getElementById('cfg-nstu').value)||12;
+  const profiles=document.getElementById('cfg-profiles').value;
+  const age=parseInt(document.getElementById('cfg-age').value)||14;
+  const cohesion=parseInt(document.getElementById('cfg-cohesion').value)||58;
+  const school=document.getElementById('cfg-school').value;
+  const env=document.getElementById('cfg-env').value;
+  const notes=document.getElementById('cfg-notes').value;
+
+  const prompt=`You are generating student profiles for an educational multi-agent simulation based on CVT (Pekrun, 2006) and SDT (Reeve, 2009).
+
+Context:
+- ISCED level: ${isced} — ${iscedLabel}
+- QS Subject Area: ${qsArea} · Subject: ${qsSubject}
+- Topic: ${topic}
+- Language of instruction: ${lang}
+- School: ${school}, ${env} environment
+- Mean age: ${age} years
+- Group cohesion: ${cohesion}/100
+- Special profiles to distribute: ${profiles}
+${notes?'- Additional context: '+notes:''}
+
+Generate EXACTLY ${nStu} student profiles. Return ONLY valid JSON array, no markdown, no explanation.
+Each student must have:
+{
+  "nombre": string (Spanish first name),
+  "emoji": string (single emoji representing the student, diverse skin tones),
+  "edad": number,
+  "perfil_especial": string (one of the special profiles above, or "ninguno"),
+  "descripcion": string (2 sentences: personality + relation to the subject),
+  "control": number (0-100, perceived control CVT),
+  "valor": number (0-100, task value CVT),
+  "autonomia": number (0-100, SDT autonomy need),
+  "competencia": number (0-100, SDT competence need),
+  "relacion": number (0-100, SDT relatedness),
+  "es_disruptivo": boolean
+}
+
+Rules:
+- Distribute special profiles across students (each profile used at most once)
+- Make control/valor values realistic and coherent with the description
+- Students with anxiety profiles should have low control (20-40)
+- Gifted students: high control, low valor (bored)
+- ADHD: moderate control, disruptive=true
+- Use diverse Spanish names and diverse emoji skin tones
+- Vary personalities realistically`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:2000,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await resp.json();
+    const txt=data.content?.[0]?.text||'';
+    const clean=txt.replace(/```json|```/g,'').trim();
+    const students=JSON.parse(clean);
+    generatedStudents=students;
+    renderStudentPreview(students);
+    status.textContent=`✓ ${students.length} student profiles generated`;
+    icon.textContent='✦';
+    btn.disabled=false;
+  }catch(e){
+    status.textContent='✗ Error: '+e.message+' — Check API key or use demo defaults';
+    icon.textContent='✦';
+    btn.disabled=false;
+  }
+}
+
+function renderStudentPreview(students){
+  const grid=document.getElementById('student-preview');
+  const EMO_COLS={enjoyment:'#4ddf8a',pride:'#a78bfa',anxiety:'#ff5a5a',boredom:'#f5b942',hopelessness:'#6b7280',neutral:'#4a9eff'};
+  function calcEmo(c,v){
+    if(c>=60&&v>=60) return 'enjoyment';
+    if(c>=65&&v<40)  return 'boredom';
+    if(c<42&&v>=58)  return 'anxiety';
+    if(c<35&&v<38)   return 'hopelessness';
+    if(c>=65)        return 'pride';
+    return 'neutral';
+  }
+  grid.innerHTML=students.map(s=>{
+    const emo=calcEmo(s.control,s.valor);
+    const col=EMO_COLS[emo]||'#4a9eff';
+    return `<div class="student-card">
+      <div class="student-card-head">
+        <span class="student-emoji">${s.emoji}</span>
+        <span class="student-name">${s.nombre}, ${s.edad}a</span>
+        ${s.perfil_especial!=='ninguno'?`<span class="student-tag">${s.perfil_especial}</span>`:''}
+      </div>
+      <div style="font-size:9px;color:#4a6090;margin-bottom:6px;line-height:1.4">${s.descripcion.slice(0,80)}…</div>
+      <div class="student-bars">
+        <div class="sbar-row"><div class="sbar-lbl">Control</div><div class="sbar-bg"><div class="sbar-fill" style="width:${s.control}%;background:${col}"></div></div><span style="font-size:8px;color:#4a6090;margin-left:3px">${s.control}</span></div>
+        <div class="sbar-row"><div class="sbar-lbl">Value</div><div class="sbar-bg"><div class="sbar-fill" style="width:${s.valor}%;background:${col};opacity:.7"></div></div><span style="font-size:8px;color:#4a6090;margin-left:3px">${s.valor}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveConfigAndStart(){
+  // Leer configuración del formulario
+  const phases=document.getElementById('cfg-phases').value
+    .split('\n').filter(l=>l.trim())
+    .map(l=>{
+      const [tipo,...rest]=l.split(':');
+      return {tipo:tipo.trim(),descripcion:rest.join(':').trim(),turnos:4};
+    });
+
+  const config={
+    isced:document.getElementById('cfg-isced').value,
+    isced_label:ISCED_LABELS[document.getElementById('cfg-isced').value]||'',
+    qs_area:document.getElementById('cfg-qs-area').value,
+    qs_subject:document.getElementById('cfg-qs-subject')?.options[document.getElementById('cfg-qs-subject').selectedIndex]?.text||'',
+    lang:document.getElementById('cfg-lang').value,
+    topic:document.getElementById('cfg-topic').value,
+    school:document.getElementById('cfg-school').value,
+    env:document.getElementById('cfg-env').value,
+    ses:document.getElementById('cfg-ses').value,
+    notes:document.getElementById('cfg-notes').value,
+    teacher:{
+      nombre:document.getElementById('cfg-tname').value,
+      edad:parseInt(document.getElementById('cfg-tage').value)||41,
+      descripcion:document.getElementById('cfg-tdesc').value,
+      sdt_autonomia:parseInt(document.getElementById('cfg-sdt-aut').value)||42,
+      sdt_estructura:parseInt(document.getElementById('cfg-sdt-str').value)||80,
+      sdt_implicacion:parseInt(document.getElementById('cfg-sdt-inv').value)||58,
+      motivacion:parseInt(document.getElementById('cfg-tmot').value)||64,
+    },
+    students:generatedStudents,
+    nStudents:parseInt(document.getElementById('cfg-nstu').value)||12,
+    profiles:document.getElementById('cfg-profiles').value,
+    meanAge:parseInt(document.getElementById('cfg-age').value)||14,
+    cohesion:parseInt(document.getElementById('cfg-cohesion').value)||58,
+    pausa:parseFloat(document.getElementById('cfg-pausa').value)||3.0,
+    threshold:parseInt(document.getElementById('cfg-threshold').value)||35,
+    phases,
+  };
+
+  sessionStorage.setItem('classroom_config', JSON.stringify(config));
+  closeConfig();
+  startDemo();
+}
+
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+startPolling();
+</script>
+</body>
+</html>
